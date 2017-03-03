@@ -1,29 +1,26 @@
  <?php
  /*
 Plugin Name: mzz-goldfeed
-Description: A feed companion plugin for gold-price plugin
+Description: A (yahoo api -based) feed companion plugin for gold-price WordPress plugin
+Version: 20170301.1617
 License: GPLv2
 */
 
-/*
-1. make a cron job as below:
-	
-	-A. set it to fire: 'twice-daily'
 
-	A. find which currency
 
-	B. pull four metals' ounce values from yahoo for that currency
+//if it's not already scheduled, then go ahead and schedule the next one
+if ( ! wp_next_scheduled( 'mzz_crongp_task_hook' ) ) {
+//  wp_schedule_event( time(), 'hourly', 'mzz_crongp_task_hook' );
+	wp_schedule_event( time(), 'three_minutes', 'mzz_crongp_task_hook' );
+}
 
-	C. if grams, then multiply/divide to get the four gram values 
+//specify what function will run when the scheduled task fires
+add_action( 'mzz_crongp_task_hook', 'mzz_goldfeed' );
 
-	D. put the resulting four values into wp_options
-*/
-	
-	
-	
-// downloads the feed into a local file
+
+
+//define what the function does
 function mzz_goldfeed() {
-
 
 // check if gold-price plugin is activated
 if ( ! is_plugin_active( 'gold-price/admin.php' ) ) {
@@ -31,7 +28,6 @@ if ( ! is_plugin_active( 'gold-price/admin.php' ) ) {
   echo "gold-price plugin is not activated! quitting...";
   return false;
 } 
-
 
 
 	$mzz_getoption_gp_currency = get_option( 'gp_currency' );
@@ -54,17 +50,11 @@ if ( ! is_plugin_active( 'gold-price/admin.php' ) ) {
 	fclose($mzzPalladiumFeed);
 
 	
-	//mzzGoldOzPrice
-	//(oz) x (28.35) = g.
+	//(oz) / (28.3495) = g.
 	$mzzGoldGramPrice = number_format((float)($mzzGoldOzPrice / 28.3495), 4, '.', '') ;
 	$mzzSilverGramPrice = number_format((float)($mzzSilverOzPrice / 28.3495), 4, '.', '') ;
 	$mzzPlatinumGramPrice = number_format((float)($mzzPlatinumOzPrice / 28.3495), 4, '.', '') ;
 	$mzzPalladiumGramPrice = number_format((float)($mzzPalladiumOzPrice / 28.3495), 4, '.', '') ;
-
-	//number_format((float)$foo, 2, '.', '')
-	
-	echo  $mzzGoldOzPrice . " " . $mzzSilverOzPrice . " " . $mzzPlatinumOzPrice . " " . $mzzPalladiumOzPrice . " " . $mzzGoldGramPrice . " " . $mzzSilverGramPrice . " " . $mzzPlatinumGramPrice . " " . $mzzPalladiumGramPrice;
-
 	
 
 	update_option( 'mzz_gp_gold_oz_price', sanitize_text_field($mzzGoldOzPrice) );
@@ -76,13 +66,22 @@ if ( ! is_plugin_active( 'gold-price/admin.php' ) ) {
 	update_option( 'mzz_gp_palladium_oz_price', sanitize_text_field($mzzPalladiumOzPrice) );
 	update_option( 'mzz_gp_palladium_gram_price', sanitize_text_field($mzzPalladiumGramPrice) );
 	
-	
-	
 }
 
-// execute when the admin_notices action is called, thus the text shows at top of WP Admin Dashboard area
-add_action( 'admin_notices', 'mzz_goldfeed' );
 
+
+
+
+
+
+
+// let's clean up after ourselves and make sure we remove the cron job upon plugin deactivation
+register_deactivation_hook( __FILE__, 'mzz_crongp_deactivate' );
+ 
+function mzz_crongp_deactivate() {
+   $timestamp = wp_next_scheduled( 'mzz_crongp_task_hook' );
+   wp_unschedule_event( $timestamp, 'mzz_crongp_task_hook' );
+}
 
 
 ?> 
